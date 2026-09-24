@@ -14,23 +14,38 @@ Your tech lead has asked you to take a look at the repository and address any se
 
 ## Running the Application
 
-Build and run with Docker:
+The application reads its credentials at runtime else it would not start:
+
+- `APP_ADMIN_USERNAME`: the Basic Auth username
+- `APP_ADMIN_PASSWORD_HASH`: a bcrypt hash of the password
+
+Generate a bcrypt hash once and store it in your secret manager or local environment. Do not commit the raw password or hash to the repository.
+
+Build the image:
 
 ```sh
 docker build -t secret-case .
-docker run -p 8080:8080 secret-case
 ```
 
-Then visit [http://localhost:8080](http://localhost:8080). You'll be prompted for credentials.
-
-- **Username:** `admin`
-- **Password:** *(check the source code)*
-
-Or test with curl:
+Run the container:
 
 ```sh
-curl -u admin:<password> http://localhost:8080
+docker run \
+  -p 8080:8080 \
+  -e APP_ADMIN_USERNAME='<username-set-me>' \
+  -e APP_ADMIN_PASSWORD_HASH='<bcrypt-hash-set-me>' \
+  secret-case
 ```
+
+Then visit [http://localhost:8080](http://localhost:8080). You'll be prompted for the configured credentials.
+
+You can also test with curl:
+
+```sh
+curl -u '<username-set-me>:<password-set-me>' http://localhost:8080
+```
+
+`APP_ADMIN_PASSWORD_HASH` must contain a bcrypt hash, not the plaintext password. The application uses `BCryptPasswordEncoder` to compare the supplied password with the stored hash.
 
 ## What We're Looking For
 
@@ -44,3 +59,15 @@ There is no single "right" answer. We want to see how you think.
 ## Time Expectation
 
 This should not take long. Don't over-engineer it. A clean, simple fix with clear reasoning is preferred over a complex one. You can hand-wave external services that might be part of your ideal design.
+
+## Security Notes
+
+* The original application stored the password in the source code and checked the Basic Auth header in the controller.
+* The application now reads the username and bcrypt password hash from the runtime environment.
+* Spring Security handles Basic Auth, checks the password hash, and protects every endpoint.
+* The application is stateless and does not need to store login sessions.
+* Repeated failed attempts for a username are limited in memory for this exercise.
+* In production, rate limiting should also run at a gateway, WAF, load balancer, or reverse proxy.
+* Production rate limiting should include the client IP address and use shared storage when multiple application instances are running.
+* Basic Auth should only be used over HTTPS outside local development.
+* Runtime secrets and password hashes should be stored in a secret manager and never committed to the repository.
